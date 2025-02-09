@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 
-class LinearRegression:
+class NeuralNetwork:
     def __init__(self, optimizer='SGD', lr=0.01, beta=0.9, beta2=0.999, epsilon=1e-8, epochs=1000):
         self.optimizer = optimizer
         self.lr = lr
@@ -119,7 +119,7 @@ def animate_training(model, W, B, loss_surface):
 
 optimizers = ['SGD', 'Momentum', 'RMSprop', 'Adam', 'Adagrad']
 for optimizer in optimizers:
-    model = LinearRegression(optimizer=optimizer, epochs=1000, lr=0.01 if optimizer in ['SGD', 'Momentum'] else 0.001)
+    model = NeuralNetwork(optimizer=optimizer, epochs=1000, lr=0.01 if optimizer in ['SGD', 'Momentum'] else 0.001)
     model.train(X_train, Y_train)
     W, B, loss_surface = compute_loss_surface(model, X_train, Y_train)
     animate_training(model, W, B, loss_surface)
