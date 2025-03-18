@@ -6,7 +6,6 @@ from sklearn.model_selection import train_test_split
 import tkinter as tk
 from tkinter import ttk
 
-# Load data from CSV
 def load_data(filepath):
     df = pd.read_csv(filepath)
     df['Gender'] = df['Gender'].map({'Male': 0, 'Female': 1})
@@ -19,14 +18,14 @@ def load_data(filepath):
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
     
-    return train_test_split(X, y, test_size=0.35, random_state=42), encoder
+    return train_test_split(X, y, test_size=0.3, random_state=42), encoder
 
 class NeuralNetwork:
     def __init__(self, input_size, hidden_sizes, output_size, dropout_rate=0.2, use_dropout=True):
         self.layers = []
         self.biases = []
         self.dropout_rate = dropout_rate
-        self.use_dropout = use_dropout  # New flag for dropout usage
+        self.use_dropout = use_dropout  
 
         sizes = [input_size] + hidden_sizes + [output_size]
         for i in range(len(sizes) - 1):
@@ -44,7 +43,7 @@ class NeuralNetwork:
         self.a = [X]
         for i in range(len(self.layers) - 1):
             X = self.relu(np.dot(X, self.layers[i]) + self.biases[i])
-            if training and self.use_dropout:  # Apply dropout only if enabled
+            if training and self.use_dropout:  
                 mask = (np.random.rand(*X.shape) > self.dropout_rate) / (1 - self.dropout_rate)
                 X *= mask
             self.a.append(X)
@@ -62,9 +61,6 @@ class NeuralNetwork:
             return np.mean((y_one_hot - y_pred) ** 2)
         return None
 
-    def compute_accuracy(self, y_true, y_pred):
-        predictions = np.argmax(y_pred, axis=1)
-        return np.mean(predictions == y_true)
 
     def backward(self, X, y, learning_rate=0.01):
         m = X.shape[0]
@@ -127,8 +123,6 @@ class NeuralNetwork:
                 print(f"Epoch {epoch}, Training Loss: {train_loss}, Validation Loss: {val_loss}")
 
         print("Final epoch:", final_epoch)
-        train_acc = self.compute_accuracy(y_train, y_train_pred)
-        val_acc = self.compute_accuracy(y_val, y_val_pred)
         
         epochs_range = range(len(train_losses))
         plt.plot(epochs_range, train_losses, label="Training Loss", color='blue')
@@ -136,11 +130,10 @@ class NeuralNetwork:
         plt.axvline(x=final_epoch, color='red', linestyle='--', label=f'Stop at {final_epoch}')
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
-        plt.title(f"Training vs Validation Loss\nFinal Train Acc: {train_acc:.4f}, Final Val Acc: {val_acc:.4f}")
         plt.legend()
         plt.show()
 
-(filepath,) = ("obesity_data.csv",)
+(filepath,) = ("./obesity_data.csv",)
 (X_train, X_test, y_train, y_test), encoder = load_data(filepath)
 
 def train_nn():
@@ -152,7 +145,7 @@ def train_nn():
     epochs = int(epochs_var.get())
     loss_function = loss_var.get()
     early = early_var.get()
-    use_dropout = dropout_var.get()  # Get dropout selection
+    use_dropout = dropout_var.get() 
 
     hidden_sizes = [neurons_per_layer] * hidden_layers
     nn = NeuralNetwork(input_size=6, hidden_sizes=hidden_sizes, output_size=len(encoder.classes_), use_dropout=use_dropout)

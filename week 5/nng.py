@@ -6,7 +6,6 @@ from sklearn.model_selection import train_test_split
 import tkinter as tk
 from tkinter import ttk
 
-# Load data from CSV
 def load_data(filepath):
     df = pd.read_csv(filepath)
     df['Gender'] = df['Gender'].map({'Male': 0, 'Female': 1})
@@ -19,71 +18,73 @@ def load_data(filepath):
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
     
-    return train_test_split(X, y, test_size=0.35, random_state=42), encoder
+    return train_test_split(X, y, test_size=0.2, random_state=42), encoder
 
 class NeuralNetwork:
     def __init__(self, input_size, hidden_sizes, output_size, dropout_rate=0.2, use_dropout=True):
         self.layers = []
         self.biases = []
-        self.dropout_rate = dropout_rate
-        self.use_dropout = use_dropout  # New flag for dropout usage
-
+        self.use_dropout = use_dropout
+        self.training = True  # Training mode flag
+        
         sizes = [input_size] + hidden_sizes + [output_size]
         for i in range(len(sizes) - 1):
-            self.layers.append(np.random.randn(sizes[i], sizes[i+1]) * 0.01)
+            # Xavier initialization
+            self.layers.append(np.random.randn(sizes[i], sizes[i+1]) * np.sqrt(2 / sizes[i]))
             self.biases.append(np.zeros((1, sizes[i+1])))
 
     def relu(self, x):
         return np.maximum(0, x)
     
+    def relu_derivative(self, x):
+        return (x > 0).astype(float)
+    
     def softmax(self, x):
         exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
         return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
-    def forward(self, X, training=True):
+    def forward(self, X):
         self.a = [X]
         for i in range(len(self.layers) - 1):
-            X = self.relu(np.dot(X, self.layers[i]) + self.biases[i])
-            if training and self.use_dropout:  # Apply dropout only if enabled
-                mask = (np.random.rand(*X.shape) > self.dropout_rate) / (1 - self.dropout_rate)
+            X = np.dot(X, self.layers[i]) + self.biases[i]
+            X = self.relu(X)
+            if self.training and self.use_dropout:
+                mask = (np.random.rand(*X.shape) > 0.2) / 0.8
                 X *= mask
             self.a.append(X)
         output = self.softmax(np.dot(X, self.layers[-1]) + self.biases[-1])
         self.a.append(output)
         return output
 
-    def compute_loss(self, y_true, y_pred, loss_type="cross_entropy"):
-        if loss_type == "cross_entropy":
-            m = y_true.shape[0]
-            return -np.sum(np.log(y_pred[np.arange(m), y_true] + 1e-8)) / m
-        elif loss_type == "mse":
-            y_one_hot = np.zeros_like(y_pred)
-            y_one_hot[np.arange(y_true.shape[0]), y_true] = 1
-            return np.mean((y_one_hot - y_pred) ** 2)
-        return None
+    def compute_loss(self, y_true, y_pred):
+        m = y_true.shape[0]
+        return -np.sum(np.log(y_pred[np.arange(m), y_true] + 1e-8)) / m
 
-    def backward(self, X, y, learning_rate=0.01):
-        m = X.shape[0]
+    def compute_accuracy(self, y_true, y_pred):
+        y_pred_labels = np.argmax(y_pred, axis=1)
+        return np.sum(y_pred_labels == y_true) / len(y_true) * 100
+
+    def backward(self, y):
+        m = y.shape[0]
         y_pred = self.a[-1]
         y_one_hot = np.zeros_like(y_pred)
         y_one_hot[np.arange(m), y] = 1
-
         dZ = y_pred - y_one_hot
 
         for i in range(len(self.layers) - 1, -1, -1):
             dW = np.dot(self.a[i].T, dZ) / m
             dB = np.sum(dZ, axis=0, keepdims=True) / m
-            dZ = np.dot(dZ, self.layers[i].T) * (self.a[i] > 0)
-            self.layers[i] -= learning_rate * dW
-            self.biases[i] -= learning_rate * dB
+            dZ = np.dot(dZ, self.layers[i].T) * self.relu_derivative(self.a[i])
+            self.layers[i] -= self.lr * dW
+            self.biases[i] -= self.lr * dB
 
-    def train(self, X_train, y_train, X_val, y_val, epochs=1000, batch_size=40, learning_rate=0.01, loss_type="cross_entropy", early_stopping=True, patience=10):
+    def train(self, X_train, y_train, X_val, y_val, epochs=1000, batch_size=40, learning_rate=0.01):
+        self.lr = learning_rate
         best_loss = float('inf')
         patience_counter = 0
         train_losses = []
         val_losses = []
-        final_epoch = None
-
+        
         for epoch in range(epochs):
             indices = np.random.permutation(X_train.shape[0])
             X_train_shuffled = X_train[indices]
@@ -94,13 +95,19 @@ class NeuralNetwork:
                 y_batch = y_train_shuffled[i:i + batch_size]
 
                 self.forward(X_batch)
-                self.backward(X_batch, y_batch, learning_rate)
+                self.backward(y_batch)
 
-            y_train_pred = self.forward(X_train, training=False)
-            y_val_pred = self.forward(X_val, training=False)
+            # Learning rate decay
+            if epoch % 100 == 0 and epoch != 0:
+                self.lr *= 0.95
 
-            train_loss = self.compute_loss(y_train, y_train_pred, loss_type)
-            val_loss = self.compute_loss(y_val, y_val_pred, loss_type)
+            self.training = False  # Disable dropout during validation
+            y_train_pred = self.forward(X_train)
+            y_val_pred = self.forward(X_val)
+            self.training = True  # Re-enable dropout
+
+            train_loss = self.compute_loss(y_train, y_train_pred)
+            val_loss = self.compute_loss(y_val, y_val_pred)
 
             train_losses.append(train_loss)
             val_losses.append(val_loss)
@@ -110,31 +117,23 @@ class NeuralNetwork:
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= patience:
-                    if early_stopping:
-                        final_epoch = epoch
-                        print(f"Early stopping triggered at epoch {epoch}")
-                        break  
-                    else:
-                        if not final_epoch:
-                            final_epoch = epoch
+                if patience_counter >= 10:
+                    print(f"Early stopping at epoch {epoch}")
+                    break
 
             if epoch % 100 == 0:
-                print(f"Epoch {epoch}, Training Loss: {train_loss}, Validation Loss: {val_loss}")
+                print(f"Epoch {epoch}: Train Loss={train_loss:.4f}, Val Loss={val_loss:.4f}")
 
-        print("Final epoch:", final_epoch)
+        print("Final Accuracy:")
+        print("Train:", self.compute_accuracy(y_train, self.forward(X_train)))
+        print("Validation:", self.compute_accuracy(y_val, self.forward(X_val)))
 
-        epochs_range = range(len(train_losses))
-        plt.plot(epochs_range, train_losses, label="Training Loss", color='blue')
-        plt.plot(epochs_range, val_losses, label="Validation Loss", color='orange')
-        plt.axvline(x=final_epoch, color='red', linestyle='--', label=f'Stop at {final_epoch}')
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        plt.title("Training vs Validation Loss")
+        plt.plot(train_losses, label="Training Loss")
+        plt.plot(val_losses, label="Validation Loss")
         plt.legend()
         plt.show()
 
-(filepath,) = ("obesity_data.csv",)
+(filepath,) = ("./obesity_data.csv",)
 (X_train, X_test, y_train, y_test), encoder = load_data(filepath)
 
 def train_nn():
@@ -150,7 +149,7 @@ def train_nn():
 
     hidden_sizes = [neurons_per_layer] * hidden_layers
     nn = NeuralNetwork(input_size=6, hidden_sizes=hidden_sizes, output_size=len(encoder.classes_), use_dropout=use_dropout)
-    nn.train(X_train, y_train, X_test, y_test, epochs, batch_size, learning_rate, loss_function, early_stopping=early)
+    nn.train(X_train, y_train, X_test, y_test, epochs, batch_size, learning_rate, loss_function )
 
 root = tk.Tk()
 root.title("Neural Network Trainer")

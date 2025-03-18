@@ -1,3 +1,5 @@
+import tkinter as tk
+from tkinter import ttk
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -21,8 +23,6 @@ class NeuralNetwork:
         self.vdw, self.sdw = 0, 0
         self.vdb, self.sdb = 0, 0
         self.t = 0
-        self.w_list = [] 
-        self.b_list = [] 
 
     def forward(self, X):
         return self.w * X + self.b
@@ -81,12 +81,14 @@ class NeuralNetwork:
                 progress_bar.set_postfix(loss=f"{self.loss_history[-1]:.4f}")
 
 np.random.seed(42)
-X = np.linspace(-10, 10, 100)
+X = np.array([np.linspace(-10, 10, 100), np.linspace(-10, 10, 100)])
+X = X.reshape(100, 2)
+print(X.shape)
 Y = 3 * X + 7 + np.sin(X) * 5 + np.random.randn(*X.shape) * 4
 
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
-def compute_loss_surface(model, X, Y, w_range=(-2, 2), b_range=(-2, 2), resolution=100):
+def compute_loss_surface(model, X, Y, w_range=(-5, 5), b_range=(-5, 5), resolution=100):
     w_vals = np.linspace(w_range[0], w_range[1], resolution)
     b_vals = np.linspace(b_range[0], b_range[1], resolution)
     W, B = np.meshgrid(w_vals, b_vals)
@@ -119,9 +121,50 @@ def animate_training(model, W, B, loss_surface):
     ax.legend()
     plt.show()
 
-optimizers = ['SGD', 'Momentum', 'RMSprop', 'Adam', 'Adagrad']
-for optimizer in optimizers:
-    model = NeuralNetwork(optimizer=optimizer, epochs=1000, lr=0.01 if optimizer in ['SGD', 'Momentum'] else 0.001)
-    model.train(X_train, Y_train)
-    W, B, loss_surface = compute_loss_surface(model, X_train, Y_train)
-    animate_training(model, W, B, loss_surface)
+# optimizers = ['SGD', 'Momentum', 'RMSprop', 'Adam', 'Adagrad']
+# for optimizer in optimizers:
+#     model = NeuralNetwork(optimizer=optimizer, epochs=1000, lr=0.01 if optimizer in ['SGD', 'Momentum'] else 0.001)
+#     model.train(X_train, Y_train)
+#     W, B, loss_surface = compute_loss_surface(model, X_train, Y_train)
+#     animate_training(model, W, B, loss_surface)
+
+
+class NeuralNetworkApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Neural Network Hyperparameter Tuning")
+
+        ttk.Label(root, text="Learning Rate:").grid(row=0, column=0, padx=10, pady=10)
+        self.lr_entry = ttk.Entry(root)
+        self.lr_entry.grid(row=0, column=1, padx=10, pady=10)
+        self.lr_entry.insert(0, "0.01")
+
+        ttk.Label(root, text="Epochs:").grid(row=1, column=0, padx=10, pady=10)
+        self.epochs_entry = ttk.Entry(root)
+        self.epochs_entry.grid(row=1, column=1, padx=10, pady=10)
+        self.epochs_entry.insert(0, "1000")
+
+        ttk.Label(root, text="Optimizer:").grid(row=2, column=0, padx=10, pady=10)
+        self.optimizer_var = tk.StringVar()
+        self.optimizer_combobox = ttk.Combobox(root, textvariable=self.optimizer_var)
+        self.optimizer_combobox['values'] = ('SGD', 'Momentum', 'RMSprop', 'Adam', 'Adagrad')
+        self.optimizer_combobox.grid(row=2, column=1, padx=10, pady=10)
+        self.optimizer_combobox.current(0)
+
+        self.train_button = ttk.Button(root, text="Train", command=self.start_training)
+        self.train_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+    def start_training(self):
+        lr = float(self.lr_entry.get())
+        epochs = int(self.epochs_entry.get())
+        optimizer = self.optimizer_var.get()
+
+        model = NeuralNetwork(optimizer=optimizer, epochs=epochs, lr=lr)
+        model.train(X_train, Y_train)
+
+        W, B, loss_surface = compute_loss_surface(model, X_train, Y_train)
+        animate_training(model, W, B, loss_surface)
+
+root = tk.Tk()
+app = NeuralNetworkApp(root)
+root.mainloop()

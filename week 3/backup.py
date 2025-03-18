@@ -22,9 +22,9 @@ class NeuralNetwork:
         self.loss_history = []  
         self.param_history = []
 
-        self.W1 = np.random.randn(hidden_size, input_size) 
+        self.W1 = np.ones((hidden_size, input_size)) * 1.5
         self.b1 = np.zeros((hidden_size, 1))
-        self.W2 = np.random.randn(output_size, hidden_size) 
+        self.W2 = np.ones((output_size, hidden_size)) * 1.5
         self.b2 = np.zeros((output_size, 1))
 
         self.vdW1, self.vdb1 = np.zeros_like(self.W1), np.zeros_like(self.b1)
@@ -146,7 +146,7 @@ class NeuralNetwork:
             if epoch % 100 == 0:
                 progress_bar.set_postfix(loss=f"{loss:.4f}")
 
-def compute_loss_surface(nn, X, Y, w1_range=(-5, 5), w2_range=(-5, 5), resolution=100):
+def compute_loss_surface(nn, X, Y, w1_range=(-2, 2), w2_range=(-2, 2), resolution=100):
     """Compute the loss surface for visualization"""
     w1_vals = np.linspace(w1_range[0], w1_range[1], resolution)
     w2_vals = np.linspace(w2_range[0], w2_range[1], resolution)
@@ -202,13 +202,14 @@ def visualize_training(nn, w1_vals, w2_vals, loss_surface):
 
 optimizer_list = ['SGD', 'Momentum', 'RMSprop', 'Adam', 'Adagrad']
 
-df = pd.read_csv('./boston_house_prices.csv', skiprows=1)
-X = df.drop(columns=['MEDV']).to_numpy()
+df = pd.read_csv('/Users/aarish/AIC3970/week 3/boston_house_prices.csv', skiprows=1)
+X = df['CRIM'].to_numpy()
 y = df['MEDV'].to_numpy()
 
-scaler = StandardScaler()
-X = scaler.fit_transform(X)
-y = (y - np.mean(y)) / np.std(y)
+# scaler = StandardScaler()
+# X = scaler.fit_transform(X)
+# y = (y - np.mean(y)) / np.std(y)
+X = X.reshape(-1, 1)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
